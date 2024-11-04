@@ -2,177 +2,138 @@ import Flutter
 import UIKit
 import PDFKit
 
+
 public class SwiftPdfTextPlugin: NSObject, FlutterPlugin {
     
-    public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "pdf_text", binaryMessenger: registrar.messenger())
-        let instance = SwiftPdfTextPlugin()
-        registrar.addMethodCallDelegate(instance, channel: channel)
-    }
+  public static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterMethodChannel(name: "pdf_text", binaryMessenger: registrar.messenger())
+    let instance = SwiftPdfTextPlugin()
+    registrar.addMethodCallDelegate(instance, channel: channel)
+  }
 
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        DispatchQueue.global(qos: .default).async {
-            if let args = call.arguments as? [String: Any] {
-                if call.method == "initDoc" {
-                    guard let path = args["path"] as? String,
-                          let password = args["password"] as? String else {
-                        DispatchQueue.main.async {
-                            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing path or password", details: nil))
-                        }
-                        return
-                    }
-                    self.initDoc(result: result, path: path, password: password)
-                } else if call.method == "getDocPageText" {
-                    guard let path = args["path"] as? String,
-                          let password = args["password"] as? String,
-                          let pageNumber = args["number"] as? Int else {
-                        DispatchQueue.main.async {
-                            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing path, password, or page number", details: nil))
-                        }
-                        return
-                    }
-                    self.getDocPageText(result: result, path: path, password: password, pageNumber: pageNumber)
-                } else if call.method == "getDocText" {
-                    guard let path = args["path"] as? String,
-                          let password = args["password"] as? String,
-                          let missingPagesNumbers = args["missingPagesNumbers"] as? [Int] else {
-                        DispatchQueue.main.async {
-                            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing path, password, or missingPagesNumbers", details: nil))
-                        }
-                        return
-                    }
-                    self.getDocText(result: result, path: path, password: password, missingPagesNumbers: missingPagesNumbers)
-                } else {
-                    DispatchQueue.main.async {
-                        result(FlutterMethodNotImplemented)
-                    }
-                }
-            } else {
-                DispatchQueue.main.async {
-                    result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid method arguments", details: nil))
-                }
+  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+
+    DispatchQueue.global(qos: .default).async {
+        if call.method == "initDoc" {
+          let args = call.arguments as! NSDictionary
+                let path = args["path"] as! String
+                let password = args["password"] as! String
+            self.initDoc(result: result, path: path, password: password)
+        } else if call.method == "getDocPageText" {
+              let args = call.arguments as! NSDictionary
+              let path = args["path"] as! String
+              let password = args["password"] as! String
+              let pageNumber = args["number"] as! Int
+            self.getDocPageText(result: result, path: path, password: password, pageNumber: pageNumber)
+        }
+           else if call.method == "getDocText" {
+              let args = call.arguments as! NSDictionary
+              let path = args["path"] as! String
+              let password = args["password"] as! String
+              let missingPagesNumbers = args["missingPagesNumbers"] as! [Int]
+            self.getDocText(result: result, path: path, password: password, missingPagesNumbers: missingPagesNumbers)
+        }
+          else {
+            DispatchQueue.main.sync {
+                result(FlutterMethodNotImplemented)
+
             }
         }
     }
+  }
+    
 
-    /**
-     Initializes the PDF document and returns some information into the channel.
-     */
-    private func initDoc(result: FlutterResult, path: String, password: String) {
-        guard let doc = getDoc(result: result, path: path, password: password) else {
+  /**
+              Initializes the PDF document and returns some information into the channel.
+       */
+      private func initDoc(result: FlutterResult, path: String, password: String) {
+        let doc = getDoc(result: result, path: path, password: password)
+        if doc == nil {
             return
         }
+        // Getting the length of the PDF document in pages.
+          let length = doc!.pageCount
         
-        let length = doc.pageCount
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd hh:mm:ss"
-
-        let attributes = doc.documentAttributes
-
-        let creationDate: String? = {
-            if let date = attributes?[PDFDocumentAttribute.creationDateAttribute] as? Date {
-                return dateFormatter.string(from: date)
-            }
-            return nil
-        }()
         
-        let modificationDate: String? = {
-            if let date = attributes?[PDFDocumentAttribute.modificationDateAttribute] as? Date {
-                return dateFormatter.string(from: date)
-            }
-            return nil
-        }()
+        let creationDate = doc!.documentAttributes![PDFDocumentAttribute.creationDateAttribute] != nil
+            ? dateFormatter.string(from: (doc!.documentAttributes![PDFDocumentAttribute.creationDateAttribute]) as! Date)
+        : nil
+        
+        let modificationDate = doc!.documentAttributes![PDFDocumentAttribute.modificationDateAttribute] != nil
+        ? dateFormatter.string(from: (doc!.documentAttributes![PDFDocumentAttribute.modificationDateAttribute] as! Date))
+        : nil
 
-        let data: [String: Any] = [
-            "length": length,
-            "info": [
-                "author": attributes?[PDFDocumentAttribute.authorAttribute],
-                "creationDate": creationDate,
-                "modificationDate": modificationDate,
-                "creator": attributes?[PDFDocumentAttribute.creatorAttribute],
-                "producer": attributes?[PDFDocumentAttribute.producerAttribute],
-                "keywords": attributes?[PDFDocumentAttribute.keywordsAttribute],
-                "title": attributes?[PDFDocumentAttribute.titleAttribute],
-                "subject": attributes?[PDFDocumentAttribute.subjectAttribute]
-            ]
-        ]
-
-        DispatchQueue.main.async {
+                
+        let data = ["length": length, "info": ["author": doc!.documentAttributes![PDFDocumentAttribute.authorAttribute], "creationDate": creationDate,
+        "modificationDate": modificationDate , "creator": doc!.documentAttributes![PDFDocumentAttribute.creatorAttribute],
+        "producer": doc!.documentAttributes![PDFDocumentAttribute.producerAttribute], "keywords": doc!.documentAttributes![PDFDocumentAttribute.keywordsAttribute],
+        "title": doc!.documentAttributes![PDFDocumentAttribute.titleAttribute], "subject": doc!.documentAttributes![PDFDocumentAttribute.subjectAttribute]]] as [String : Any]
+    
+        DispatchQueue.main.sync {
             result(data)
         }
-    }
-
+      }
+    
+  
     /**
-     Gets the text of a document page, given its number.
+            Gets the text  of a document page, given its number.
      */
-    private func getDocPageText(result: FlutterResult, path: String, password: String, pageNumber: Int) {
-        guard let doc = getDoc(result: result, path: path, password: password) else {
+    private func getDocPageText(result: FlutterResult, path: String,
+                                password: String, pageNumber: Int) {
+      let doc = getDoc(result: result, path: path, password: password)
+        if doc == nil {
             return
         }
-        
-        // Safely get the page at the specified number
-        guard let page = doc.page(at: pageNumber - 1) else {
-            DispatchQueue.main.async {
-                result(FlutterError(code: "PAGE_NOT_FOUND", message: "Page not found at index \(pageNumber)", details: nil))
-            }
-            return
-        }
-        
-        // Safely retrieve the text of the page
-        let text = page.string ?? ""
-        
-        // Return the result back to the main thread
-        DispatchQueue.main.async {
+        let text = doc!.page(at: pageNumber-1)!.string
+        DispatchQueue.main.sync {
             result(text)
         }
     }
-
+    
     /**
-     Gets the text of the entire document.
-     In order to improve the performance, it only retrieves the pages that are currently missing.
+            Gets the text of the entire document.
+            In order to improve the performance, it only retrieves the pages that are currently missing.
      */
-    private func getDocText(result: FlutterResult, path: String, password: String, missingPagesNumbers: [Int]) {
-        guard let doc = getDoc(result: result, path: path, password: password) else {
+    private func getDocText(result: FlutterResult, path: String,
+                            password: String, missingPagesNumbers: [Int]) {
+      let doc = getDoc(result: result, path: path, password: password)
+        if doc == nil {
             return
         }
-
         var missingPagesTexts = [String]()
-        for pageNumber in missingPagesNumbers {
-            if let page = doc.page(at: pageNumber - 1) {
-                let pageText = page.string ?? ""
-                missingPagesTexts.append(pageText)
-            } else {
-                // Append empty text or handle missing pages if necessary
-                missingPagesTexts.append("")
-            }
+        missingPagesNumbers.forEach { (pageNumber) in
+            missingPagesTexts.append(doc!.page(at: pageNumber-1)!.string!)
         }
-
-        // Return the result back to the main thread
-        DispatchQueue.main.async {
+        DispatchQueue.main.sync {
             result(missingPagesTexts)
         }
     }
-
+    
     /**
-     Gets a PDF document, given its path.
-     */
+           Gets a PDF document, given its path.
+    */
     private func getDoc(result: FlutterResult, path: String, password: String = "") -> PDFDocument? {
-        // Safely initialize the PDFDocument from the file path
-        guard let doc = PDFDocument(url: URL(fileURLWithPath: path)) else {
-            DispatchQueue.main.async {
-                result(FlutterError(code: "INVALID_PATH", message: "File path is invalid", details: nil))
+        let doc = PDFDocument(url: URL(fileURLWithPath: path))
+        if doc == nil {
+            DispatchQueue.main.sync {
+                result(FlutterError(code: "INVALID_PATH",
+                message: "File path is invalid",
+                details: nil))
             }
             return nil
         }
-        
-        // Check if the document is locked and try to unlock it with the provided password
-        if !doc.unlock(withPassword: password) {
-            DispatchQueue.main.async {
-                result(FlutterError(code: "INVALID_PASSWORD", message: "The password is invalid", details: nil))
+        if !doc!.unlock(withPassword: password) {
+          DispatchQueue.main.sync {
+                result(FlutterError(code: "INVALID_PASSWORD",
+                message: "The password is invalid",
+                details: nil))
             }
             return nil
         }
-        
         return doc
     }
+    
+
 }
