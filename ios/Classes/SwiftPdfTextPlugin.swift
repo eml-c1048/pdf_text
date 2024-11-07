@@ -104,7 +104,7 @@ public class SwiftPdfTextPlugin: NSObject, FlutterPlugin {
         }
         var missingPagesTexts = [String]()
         missingPagesNumbers.forEach { (pageNumber) in
-            missingPagesTexts.append(doc!.page(at: pageNumber-1)!.string!)
+            missingPagesTexts.append(doc?.page(at: pageNumber-1)?.string ?? "")
         }
         DispatchQueue.main.sync {
             result(missingPagesTexts)
