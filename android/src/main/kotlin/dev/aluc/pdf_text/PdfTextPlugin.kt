@@ -12,16 +12,18 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.PluginRegistry.Registrar
 import java.io.File
 import kotlin.concurrent.thread
 
 /** PdfTextPlugin */
 class PdfTextPlugin: FlutterPlugin, MethodCallHandler {
 
+  private var channel: MethodChannel? = null
+
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-    val channel = MethodChannel(flutterPluginBinding.binaryMessenger, "pdf_text")
-    channel.setMethodCallHandler(PdfTextPlugin())
+    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "pdf_text").also {
+      it.setMethodCallHandler(this)
+    }
     PDFBoxResourceLoader.init(flutterPluginBinding.applicationContext)
   }
 
@@ -34,14 +36,7 @@ class PdfTextPlugin: FlutterPlugin, MethodCallHandler {
   // them functionally equivalent. Only one of onAttachedToEngine or registerWith will be called
   // depending on the user's project. onAttachedToEngine or registerWith must both be defined
   // in the same class.
-  companion object {
-    @JvmStatic
-    fun registerWith(registrar: Registrar) {
-      val channel = MethodChannel(registrar.messenger(), "pdf_text")
-      channel.setMethodCallHandler(PdfTextPlugin())
-      PDFBoxResourceLoader.init(registrar.context())
-    }
-  }
+  // Legacy `registerWith` removed (pre-Flutter-1.12). Modern projects use automatic registration.
 
   override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
     thread (start = true) {
@@ -77,6 +72,8 @@ class PdfTextPlugin: FlutterPlugin, MethodCallHandler {
   }
 
   override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+    channel?.setMethodCallHandler(null)
+    channel = null
   }
 
   /**
